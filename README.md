@@ -5,7 +5,7 @@ Full-screen "spaceship console" energy dashboard for an old Fire 7 tablet, fed l
 
 - **hud**: holographic HUD with glowing nodes and animated energy streams
 - **lcars**: Star Trek LCARS panels with chasing segment bars and a stardate
-- **crt**: Nostromo-style amber terminal with ASCII flow arrows
+- **crt**: Fallout-style green Pip-Boy STAT screen: the house as the "character" with condition bars per power source, HP = battery, LEVEL = self-sufficiency, CAPS = today's grid cost (pence)
 
 Tap the top-right corner to switch theme, or open with `?theme=hud|lcars|crt`. `?demo=1` simulates a sunny afternoon.
 
