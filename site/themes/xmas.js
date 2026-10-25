@@ -1,218 +1,293 @@
-// Christmas: a snowy night. A log cottage with warm windows and roof lights, a big tree whose fairy
-// lights fill up with the battery charge, presents with gift tags for the readouts, a snowman
-// counting the sleeps, a robin on the fence, falling snow and a sleigh crossing the moon.
+// Christmas, cinematic: a snowy night shot with a shallow depth of field. A softly out-of-focus
+// village glows on the hill, a richly lit fir tree stands in the middle ground, and foreground
+// lens bokeh drifts past. The tree's fairy lights fill from the bottom up with the battery
+// charge and twinkle with star-flare glints; the wooden sign counts the sleeps. All readings sit
+// on large frosted-glass cards so they're legible on a 7" tablet.
+//
+// Performance: blur and grain filters are only on static layers; everything that moves animates
+// opacity/transform (cheap on old WebViews). Snow and bokeh are soft radial gradients, not blurs.
 (function (HC) {
   'use strict';
   var fmt = HC.format, Art = HC.art;
-  var GOLD = '#ffd36b', RED = '#d62839', GREEN = '#1f6f43', CREAM = '#fff6e0';
-  var LIGHTS = 36;
+
+  var GOLD = '#ffd58a', WARM = '#ffb35c', CREAM = '#fff4dc';
+  var LIGHTS = 40;
+  var TREE = { x: 880, top: 150, base: 600, half: 230 };
   var el = {};
 
   var CSS =
-    '.theme-xmas { background:#0b1a3a; font-family: "Georgia", serif; }' +
+    '.theme-xmas { background:#050b1c; font-family: "Segoe UI", "Roboto", "Helvetica Neue", sans-serif; color:#fff; }' +
     '.theme-xmas svg { position:absolute; left:0; top:0; }' +
-    '.theme-xmas .snow i { position:absolute; top:-20px; border-radius:50%; background:#fff; animation: xsnow linear infinite; }' +
-    '@keyframes xsnow { 0% { transform: translate(0, 0) } 50% { transform: translate(24px, 420px) } 100% { transform: translate(-10px, 840px) } }' +
-    '.theme-xmas .bulb { transition: opacity 1s; }' +
-    '.theme-xmas .bulb.on { animation: xtwinkle 1.8s ease-in-out infinite; }' +
-    '@keyframes xtwinkle { 0%, 100% { opacity:1 } 50% { opacity:.45 } }' +
-    '.theme-xmas .script { font-family: "Segoe Script", "Brush Script MT", "Dancing Script", cursive; }';
+    '.theme-xmas .bulb .halo { transition: opacity 1s; }' +
+    '.theme-xmas .bulb.on .halo { animation: xmtw 2.4s ease-in-out infinite; }' +
+    '@keyframes xmtw { 0%, 100% { opacity:.95 } 50% { opacity:.45 } }' +
+    '.theme-xmas .flare { animation: xmflare 5s ease-in-out infinite; opacity:0; }' +
+    '@keyframes xmflare { 0%, 70%, 100% { opacity:0; transform: scale(.4) rotate(0deg) } 82% { opacity:1; transform: scale(1) rotate(20deg) } }' +
+    // falling snow, two depths: far flakes small and crisp, near flakes large and soft (out of focus)
+    '.theme-xmas .snow i { position:absolute; top:-40px; border-radius:50%; animation: xmsnow linear infinite; }' +
+    '.theme-xmas .snow i.far { background: rgba(255,255,255,.85); }' +
+    '.theme-xmas .snow i.near { background: radial-gradient(circle, rgba(255,255,255,.55) 0%, rgba(255,255,255,.18) 45%, rgba(255,255,255,0) 70%); }' +
+    '@keyframes xmsnow { 0% { transform: translate(0,0) } 50% { transform: translate(30px,440px) } 100% { transform: translate(-12px,880px) } }' +
+    '.theme-xmas .bokeh i { position:absolute; border-radius:50%; animation: xmdrift ease-in-out infinite alternate; }' +
+    '@keyframes xmdrift { from { transform: translate(0,0) } to { transform: translate(26px,-18px) } }' +
+    // frosted-glass reading cards
+    '.theme-xmas .cards { position:absolute; left:36px; right:36px; bottom:30px; height:150px; }' +
+    '.theme-xmas .card { position:absolute; top:0; width:283px; height:150px; box-sizing:border-box; padding:16px 22px 0; border-radius:20px;' +
+      ' background: linear-gradient(160deg, rgba(22,34,62,.88), rgba(6,12,28,.92)); border:1px solid rgba(255,220,160,.28);' +
+      ' box-shadow: 0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.18); }' +
+    '.theme-xmas .card .lbl { font-size:19px; letter-spacing:3px; color:' + GOLD + '; font-weight:600; }' +
+    '.theme-xmas .card .val { font-size:58px; line-height:68px; font-weight:700; color:#fff; text-shadow: 0 2px 10px rgba(0,0,0,.6); white-space:nowrap; }' +
+    '.theme-xmas .card .val small { font-size:24px; font-weight:600; margin-left:6px; color:rgba(255,255,255,.75); }' +
+    '.theme-xmas .card .sub { font-size:19px; color:rgba(255,244,220,.9); white-space:nowrap; }' +
+    '.theme-xmas .card .dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:10px; vertical-align:2px; }' +
+    '.theme-xmas .top { position:absolute; left:40px; right:40px; top:26px; display:flex; justify-content:space-between; align-items:flex-start; text-shadow: 0 2px 12px rgba(0,0,0,.7); }' +
+    '.theme-xmas .top .title { font-family: Georgia, "Times New Roman", serif; font-size:30px; letter-spacing:6px; color:' + CREAM + '; }' +
+    '.theme-xmas .top .title small { display:block; font-family: "Segoe UI", Roboto, sans-serif; font-size:18px; letter-spacing:3px; color:rgba(255,244,220,.75); margin-top:4px; }' +
+    '.theme-xmas .top .clock { font-size:64px; font-weight:300; line-height:60px; text-align:right; }' +
+    '.theme-xmas .top .clock small { display:block; font-size:18px; letter-spacing:2px; color:rgba(255,255,255,.75); font-weight:400; }';
 
-  function tier(cx, topY, w, h) {
-    // A fir tier with a scalloped lower edge and a snowy rim.
-    var l = cx - w / 2, r = cx + w / 2, by = topY + h, d = 'M' + cx + ' ' + topY + ' L' + r + ' ' + by;
-    for (var i = 5; i >= 0; i--) d += ' Q ' + (l + (i + 0.5) * w / 6) + ' ' + (by + 16) + ', ' + (l + i * w / 6) + ' ' + by;
-    var snow = 'M' + (l + 8) + ' ' + (by - 2);
-    for (i = 0; i < 6; i++) snow += ' Q ' + (l + (i + 0.5) * w / 6) + ' ' + (by + 10) + ', ' + (l + (i + 1) * w / 6 - (i === 5 ? 8 : 0)) + ' ' + (by - 2);
-    return '<path d="' + d + ' Z" fill="' + GREEN + '"/><path d="' + d + ' Z" fill="url(#xtreeshade)"/>' +
-      '<path d="' + snow + '" stroke="#f4fbff" stroke-width="6" fill="none" stroke-linecap="round"/>';
-  }
-
-  function gift(key, x, w, h, color, ribbon, label) {
-    var y = 690 - h;
-    return '<g><rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="4" fill="' + color + '"/>' +
-      '<rect x="' + (x + w / 2 - 7) + '" y="' + y + '" width="14" height="' + h + '" fill="' + ribbon + '"/>' +
-      '<rect x="' + x + '" y="' + (y + h * 0.35) + '" width="' + w + '" height="12" fill="' + ribbon + '"/>' +
-      '<path d="M' + (x + w / 2) + ' ' + y + ' C ' + (x + w / 2 - 34) + ' ' + (y - 26) + ', ' + (x + w / 2 - 30) + ' ' + (y + 6) + ', ' + (x + w / 2) + ' ' + y +
-        ' C ' + (x + w / 2 + 30) + ' ' + (y + 6) + ', ' + (x + w / 2 + 34) + ' ' + (y - 26) + ', ' + (x + w / 2) + ' ' + y + '" fill="' + ribbon + '"/>' +
-      // gift tag tied onto the front of the box
-      '<g transform="translate(' + (x + w / 2) + ' ' + (y + h - 26) + ') rotate(-4)">' +
-        '<path d="M' + (-w / 2 + 8) + ' -16 L' + (w / 2 - 8) + ' -16 L' + (w / 2 - 2) + ' 0 L' + (w / 2 - 8) + ' 16 L' + (-w / 2 + 8) + ' 16 Z" fill="' + CREAM + '" stroke="#c9a96e" stroke-width="2"/>' +
-        '<circle cx="' + (w / 2 - 10) + '" cy="0" r="2.5" fill="#c9a96e"/>' +
-        '<text x="-4" y="-3" text-anchor="middle" font-size="9.5" fill="#8a5a2a" letter-spacing="1">' + label + '</text>' +
-        '<text x="-4" y="12" text-anchor="middle" font-size="14" font-weight="700" fill="' + RED + '" data-k="' + key + 'Val"></text></g></g>';
-  }
-
-  function scene() {
-    var r = Art.rng(2512), s = '';
-    // Stars twinkling.
-    for (var i = 0; i < 90; i++) {
-      var sx = Math.round(r() * 1280), sy = Math.round(r() * 470), sr = (0.6 + r() * 1.6).toFixed(1);
-      s += '<circle cx="' + sx + '" cy="' + sy + '" r="' + sr + '" fill="#fff"><animate attributeName="opacity" values="1;.25;1" dur="' + (2 + r() * 4).toFixed(1) + 's" begin="-' + (r() * 4).toFixed(1) + 's" repeatCount="indefinite"/></circle>';
+  // ---------- scenery ----------
+  function sky() {
+    var r = Art.rng(1224), s = '<rect width="1280" height="800" fill="url(#xmsky)"/>';
+    for (var i = 0; i < 120; i++) {
+      var x = r() * 1280, y = r() * 380, o = (0.25 + r() * 0.6).toFixed(2);
+      s += '<circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="' + (0.5 + r() * 1.1).toFixed(1) + '" fill="#fff" opacity="' + o + '"/>';
     }
-    // A soft aurora ribbon.
-    s += '<path d="M-50 210 C 200 140, 420 260, 700 180 C 950 110, 1100 220, 1350 150" stroke="url(#xaurora)" stroke-width="46" fill="none" opacity=".12" stroke-linecap="round">' +
-      '<animate attributeName="opacity" values=".06;.15;.06" dur="12s" repeatCount="indefinite"/></path>';
-    // Moon and the guiding star.
-    s += '<circle cx="190" cy="120" r="80" fill="url(#xmoonglow)"/><circle cx="190" cy="120" r="46" fill="#fff8de"/><circle cx="210" cy="108" r="42" fill="#0e2148"/>' +
-      '<g transform="translate(1180 70)"><path d="M0 -26 L5 -5 L26 0 L5 5 L0 26 L-5 5 L-26 0 L-5 -5 Z" fill="#fffbe6"/><circle r="22" fill="url(#xstarglow)"/>' +
-        '<animateTransform attributeName="transform" type="scale" additive="sum" values="1;1.2;1" dur="3s" repeatCount="indefinite"/></g>';
-    // Santa's sleigh and reindeer crossing the sky.
-    var deer = '';
-    for (i = 0; i < 4; i++) {
-      var dx = 60 + i * 38;
-      deer += '<g transform="translate(' + dx + ' ' + (-i * 4) + ')"><ellipse cx="0" cy="0" rx="14" ry="6" fill="#140f1f"/><path d="M10 -3 L18 -12 L22 -10 M18 -12 L16 -20 M18 -12 L24 -18" stroke="#140f1f" stroke-width="2" fill="none"/>' +
-        '<path d="M-10 4 L-14 12 M-4 4 L-2 12 M6 4 L10 12 M10 4 L14 11" stroke="#140f1f" stroke-width="2"/>' + (i === 3 ? '<circle cx="23" cy="-9" r="3" fill="#ff3b3b"/>' : '') + '</g>';
-    }
-    s += '<g><path d="M-30 -6 C -30 8, -10 10, 20 8 L 26 -8 L 0 -6 Z" fill="#140f1f"/><path d="M-36 10 C -20 16, 20 16, 34 8" stroke="#140f1f" stroke-width="2" fill="none"/>' +
-      '<circle cx="-6" cy="-14" r="7" fill="#140f1f"/><path d="M20 -2 L 60 -4" stroke="#140f1f" stroke-width="1"/>' + deer +
-      '<animateMotion dur="38s" begin="-6s" repeatCount="indefinite" path="M-260 260 C 200 120, 700 60, 1500 150"/></g>';
-    // Distant hills and a snowy fir forest.
-    s += '<path d="M0 560 C 200 500, 420 540, 640 505 C 860 470, 1060 530, 1280 500 L1280 800 L0 800 Z" fill="#cfe0f3"/>';
-    for (i = 0; i < 22; i++) {
-      var fx = i * 62 + r() * 30, fh = 50 + r() * 50, fy = 548 - Math.sin(i * 0.5) * 18;
-      s += '<path d="M' + fx + ' ' + (fy - fh) + ' L' + (fx + fh * 0.32) + ' ' + fy + ' L' + (fx - fh * 0.32) + ' ' + fy + ' Z" fill="#244a63"/>' +
-        '<path d="M' + fx + ' ' + (fy - fh) + ' L' + (fx + fh * 0.14) + ' ' + (fy - fh * 0.56) + ' L' + (fx - fh * 0.14) + ' ' + (fy - fh * 0.56) + ' Z" fill="#eef6ff"/>';
-    }
-    s += '<path d="M0 620 C 260 590, 520 640, 760 615 C 1000 590, 1150 630, 1280 610 L1280 800 L0 800 Z" fill="#eef5ff"/>' +
-      '<path d="M0 700 C 300 680, 800 720, 1280 690 L1280 800 L0 800 Z" fill="#ffffff"/>' +
-      '<path d="M340 800 C 330 740, 305 690, 295 656" stroke="#dbe8f7" stroke-width="40" fill="none"/>';
-
-    // ---- the cottage ----
-    s += '<g>' +
-      '<rect x="380" y="380" width="34" height="80" fill="#7a3f2b"/><rect x="374" y="372" width="46" height="12" fill="#f4fbff"/>' +
-      '<g fill="#e6edf5" opacity=".7"><circle cx="397" cy="350" r="11"><animate attributeName="cy" values="356;270" dur="5s" repeatCount="indefinite"/><animate attributeName="opacity" values=".7;0" dur="5s" repeatCount="indefinite"/></circle>' +
-        '<circle cx="404" cy="340" r="15"><animate attributeName="cy" values="356;250" dur="5s" begin="2.5s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;0" dur="5s" begin="2.5s" repeatCount="indefinite"/></circle></g>' +
-      // log walls
-      '<rect x="140" y="470" width="310" height="182" fill="#8b5a3c"/>' +
-      [0, 1, 2, 3, 4, 5, 6].map(function (j) { return '<rect x="140" y="' + (474 + j * 26) + '" width="310" height="4" fill="#6e4429"/><circle cx="146" cy="' + (486 + j * 26) + '" r="8" fill="#a8744f"/><circle cx="444" cy="' + (486 + j * 26) + '" r="8" fill="#a8744f"/>'; }).join('') +
-      // roof with snow and icicles
-      '<path d="M108 486 L295 340 L482 486 Z" fill="#5b3a2e"/>' +
-      '<path d="M100 490 L295 330 L490 490 L470 498 Q 430 486, 400 500 Q 360 484, 320 500 Q 280 484, 240 500 Q 200 486, 160 500 Q 130 488, 112 500 Z" fill="#f7fbff"/>' +
-      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(function (j) { var ix = 124 + j * 30; return '<path d="M' + ix + ' 498 L' + (ix + 5) + ' ' + (514 + (j * 7) % 13) + ' L' + (ix + 10) + ' 498 Z" fill="#dff1ff"/>'; }).join('') +
-      // solar panels on the roof, brushed clear of snow
-      '<g transform="translate(318 380) rotate(38)"><rect width="110" height="40" fill="#1d3557" stroke="#c9d6e3" stroke-width="2"/><path d="M27 0 L27 40 M55 0 L55 40 M82 0 L82 40 M0 20 L110 20" stroke="#7fa7d6" stroke-width="1"/>' +
-        '<rect width="110" height="40" fill="#bfe6ff" opacity="0" data-k="panelGlow"/></g>' +
-      // windows with warm light, door with wreath
-      '<circle cx="210" cy="560" r="70" fill="url(#xwarm)"/><circle cx="380" cy="560" r="70" fill="url(#xwarm)"/>' +
-      [175, 345].map(function (wx) {
-        return '<rect x="' + wx + '" y="530" width="70" height="60" fill="#ffc96b"/><rect x="' + wx + '" y="530" width="70" height="60" fill="url(#xwindow)"/>' +
-          '<path d="M' + (wx + 35) + ' 530 L' + (wx + 35) + ' 590 M' + wx + ' 560 L' + (wx + 70) + ' 560" stroke="#5b3a2e" stroke-width="5"/>' +
-          '<rect x="' + (wx - 6) + '" y="588" width="82" height="10" fill="#f7fbff"/><rect x="' + (wx - 4) + '" y="526" width="78" height="64" fill="none" stroke="#5b3a2e" stroke-width="6"/>';
-      }).join('') +
-      '<rect x="262" y="560" width="66" height="92" rx="30" fill="#7a2a22"/><circle cx="318" cy="610" r="4" fill="' + GOLD + '"/>' +
-      '<circle cx="295" cy="582" r="20" fill="none" stroke="#2f7d4a" stroke-width="10"/><circle cx="286" cy="574" r="3" fill="' + RED + '"/><circle cx="304" cy="576" r="3" fill="' + RED + '"/><circle cx="296" cy="592" r="3" fill="' + RED + '"/>' +
-      '<path d="M288 600 L 295 594 L 302 600" stroke="' + RED + '" stroke-width="4" fill="none"/>' +
-      '</g>';
-    // Fairy lights along the roof edge.
-    var roof = '';
-    for (i = 0; i < 16; i++) {
-      var t = i / 15, lx = 112 + t * 183, ly = 494 - t * 150;
-      if (i > 0) roof += '';
-      roof += '<circle cx="' + lx + '" cy="' + ly + '" r="5" fill="' + ['#ff4d4d', '#ffd34d', '#4dd2ff', '#6dff8a'][i % 4] + '" class="bulb on" style="animation-delay:-' + (i * 0.23).toFixed(2) + 's"/>';
-      roof += '<circle cx="' + (478 - t * 183) + '" cy="' + ly + '" r="5" fill="' + ['#6dff8a', '#4dd2ff', '#ffd34d', '#ff4d4d'][i % 4] + '" class="bulb on" style="animation-delay:-' + (i * 0.31).toFixed(2) + 's"/>';
-    }
-    s += roof;
-
-    // ---- fence with a robin, lantern ----
-    s += '<g fill="#7a4b2a">' + [530, 590, 650, 710].map(function (x) { return '<rect x="' + x + '" y="610" width="12" height="70"/><path d="M' + x + ' 610 L' + (x + 6) + ' 600 L' + (x + 12) + ' 610 Z"/><rect x="' + (x - 2) + '" y="602" width="16" height="6" fill="#f7fbff"/>'; }).join('') +
-      '<rect x="526" y="628" width="200" height="8"/><rect x="526" y="654" width="200" height="8"/></g>' +
-      '<g transform="translate(716 596)"><ellipse cx="0" cy="0" rx="13" ry="10" fill="#6b4a33"/><ellipse cx="5" cy="3" rx="8" ry="7" fill="#e2552b"/><circle cx="10" cy="-6" r="7" fill="#6b4a33"/>' +
-        '<circle cx="13" cy="-7" r="1.6" fill="#111"/><path d="M16 -5 L 21 -4 L 16 -2 Z" fill="#e8a92a"/><path d="M-12 -2 L -22 -8 L -20 2 Z" fill="#5a3d2a"/>' +
-        '<animateTransform attributeName="transform" type="translate" additive="sum" values="0 0;0 0;0 -3;0 0;0 0" keyTimes="0;0.6;0.65;0.7;1" dur="4s" repeatCount="indefinite"/></g>';
-
-    // ---- snowman with the countdown sign ----
-    s += '<g transform="translate(610 700)">' +
-      '<ellipse cx="0" cy="-40" rx="52" ry="44" fill="#fff" stroke="#d7e4f2" stroke-width="3"/><circle cx="0" cy="-112" r="36" fill="#fff" stroke="#d7e4f2" stroke-width="3"/><circle cx="0" cy="-170" r="27" fill="#fff" stroke="#d7e4f2" stroke-width="3"/>' +
-      '<rect x="-24" y="-202" width="48" height="8" fill="#222"/><rect x="-16" y="-232" width="32" height="32" fill="#222"/><rect x="-16" y="-210" width="32" height="6" fill="' + RED + '"/>' +
-      '<circle cx="-9" cy="-176" r="3" fill="#222"/><circle cx="9" cy="-176" r="3" fill="#222"/><path d="M0 -168 L 22 -164 L 0 -162 Z" fill="#f28c28"/>' +
-      [-10, -4, 3, 10].map(function (x, j) { return '<circle cx="' + x + '" cy="' + (-156 + Math.abs(x) * 0.2 + (j % 2)) + '" r="1.8" fill="#222"/>'; }).join('') +
-      '<path d="M-30 -142 C -10 -132, 10 -132, 30 -142 L 30 -130 C 10 -122, -10 -122, -30 -130 Z" fill="' + RED + '"/><path d="M18 -132 L 26 -96 L 38 -100 L 28 -134 Z" fill="' + RED + '"/>' +
-      '<circle cx="0" cy="-116" r="4" fill="#222"/><circle cx="0" cy="-98" r="4" fill="#222"/>' +
-      '<path d="M-34 -118 L -78 -150 M-62 -138 L -70 -154" stroke="#6e4429" stroke-width="5" stroke-linecap="round"/>' +
-      '<path d="M34 -118 L 80 -142" stroke="#6e4429" stroke-width="5" stroke-linecap="round"/>' +
-      '<g transform="translate(64 -226) rotate(6)"><rect x="0" y="0" width="7" height="90" fill="#8a5a3a"/><rect x="-74" y="-56" width="156" height="62" rx="6" fill="#f7e7c6" stroke="#8a5a3a" stroke-width="3"/>' +
-        '<text x="4" y="-26" text-anchor="middle" font-size="30" font-weight="700" fill="' + RED + '" data-k="sleeps"></text>' +
-        '<text x="4" y="-6" text-anchor="middle" font-size="11" fill="#5b3a2e" data-k="sleepsLbl"></text></g>' +
-      '</g>';
-
-    // ---- the tree ----
-    s += '<rect x="884" y="640" width="32" height="50" fill="#6e4429"/>' +
-      tier(900, 190, 150, 120) + tier(900, 260, 230, 140) + tier(900, 350, 310, 160) + tier(900, 450, 390, 190);
-    // Garland swags and baubles.
-    s += '<g stroke="' + GOLD + '" stroke-width="4" fill="none" opacity=".9"><path d="M850 300 Q 900 330, 960 296"/><path d="M820 395 Q 900 440, 990 388"/><path d="M780 500 Q 900 560, 1030 492"/><path d="M745 610 Q 900 680, 1065 600"/></g>';
-    var baubles = [[870, 280, RED], [935, 330, GOLD], [840, 380, '#3b82f6'], [960, 430, RED], [880, 460, '#c084fc'], [800, 520, GOLD], [1000, 540, '#3b82f6'], [900, 560, RED], [770, 610, '#c084fc'], [1040, 620, GOLD], [860, 625, '#3b82f6'], [960, 610, RED]];
-    s += baubles.map(function (b) { return '<circle cx="' + b[0] + '" cy="' + b[1] + '" r="11" fill="' + b[2] + '"/><circle cx="' + (b[0] - 3) + '" cy="' + (b[1] - 4) + '" r="3" fill="#fff" opacity=".7"/><rect x="' + (b[0] - 3) + '" y="' + (b[1] - 14) + '" width="6" height="4" fill="#d4af37"/>'; }).join('');
-    // Fairy lights: LIGHTS bulbs spiralling down; how many are lit follows the battery.
-    var lights = '';
-    for (i = 0; i < LIGHTS; i++) {
-      t = i / (LIGHTS - 1);
-      var ty = 210 + t * 440, half = 30 + t * 165, tx = 900 + Math.sin(t * 22) * half * 0.9;
-      lights += '<circle cx="' + tx.toFixed(1) + '" cy="' + ty.toFixed(1) + '" r="6" fill="' + ['#ffe066', '#ff6b6b', '#74c0fc', '#8ce99a', '#ffa94d'][i % 5] + '" class="bulb" data-k="light' + i + '" style="animation-delay:-' + (i * 0.17).toFixed(2) + 's"/>';
-    }
-    s += lights;
-    // Star on top, brighter while the battery charges.
-    s += '<g transform="translate(900 182)"><circle r="40" fill="url(#xstarglow)" data-k="topGlow"/><path d="M0 -30 L8 -10 L30 -9 L13 4 L19 26 L0 14 L-19 26 L-13 4 L-30 -9 L-8 -10 Z" fill="' + GOLD + '" stroke="#f5b700" stroke-width="2"/>' +
-      '<animateTransform attributeName="transform" type="rotate" additive="sum" values="-4;4;-4" dur="6s" repeatCount="indefinite"/></g>';
-    // Presents with gift tags for the readouts.
-    s += gift('pv', 690, 124, 78, RED, GOLD, 'FROM THE SUN') + gift('grid', 950, 124, 72, '#2b6cb0', '#f7fbff', 'GRID') +
-      gift('load', 820, 124, 62, '#2f855a', RED, 'HOUSE USES') + gift('cost', 1080, 124, 86, '#805ad5', GOLD, 'SPENT TODAY');
-    // Tree-lights legend and title.
-    s += '<g transform="translate(830 718)"><rect x="-140" y="0" width="280" height="56" rx="14" fill="rgba(11,26,58,.75)" stroke="' + GOLD + '" stroke-width="2"/>' +
-      '<text x="0" y="23" text-anchor="middle" font-size="14" fill="#f7e7c6" letter-spacing="2">TREE LIGHTS = BATTERY</text>' +
-      '<text x="0" y="46" text-anchor="middle" font-size="20" font-weight="700" fill="' + GOLD + '" data-k="battLine"></text></g>' +
-      '<text x="640" y="70" text-anchor="middle" font-size="58" fill="' + CREAM + '" class="script" filter="url(#xglowf)">Season\'s Greetings</text>' +
-      '<text x="640" y="108" text-anchor="middle" font-size="20" fill="#cfe0f3" letter-spacing="3" data-k="sub"></text>';
+    // soft moon glow behind thin haze
+    s += '<circle cx="210" cy="150" r="220" fill="url(#xmmoonglow)"/><circle cx="210" cy="150" r="44" fill="#fdf6e3" opacity=".92"/>';
     return s;
+  }
+
+  // Distant hill village: drawn sharp, then blurred once (static) for depth of field.
+  function village() {
+    var r = Art.rng(77), s = '<path d="M0 500 C 220 455, 430 495, 640 470 C 860 445, 1060 490, 1280 465 L1280 640 L0 640 Z" fill="#1b2a4a"/>';
+    for (var i = 0; i < 26; i++) {
+      var x = 20 + i * 48 + r() * 18, h = 26 + r() * 30, y = 492 - Math.sin(i * 0.45) * 16 - h, w = 30 + r() * 16;
+      s += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + (h + 30) + '" fill="#13203b"/>' +
+        '<path d="M' + (x - 4) + ' ' + y + ' L' + (x + w / 2) + ' ' + (y - 16) + ' L' + (x + w + 4) + ' ' + y + ' Z" fill="#e8eef7"/>';
+      if (r() < 0.8) s += '<rect x="' + (x + 7) + '" y="' + (y + 10) + '" width="8" height="9" fill="' + WARM + '"/>';
+      if (r() < 0.6) s += '<rect x="' + (x + w - 15) + '" y="' + (y + 10) + '" width="8" height="9" fill="' + GOLD + '"/>';
+    }
+    for (i = 0; i < 30; i++) {
+      var fx = r() * 1280, fh = 40 + r() * 50, fy = 520 - Math.sin(fx / 200) * 12;
+      s += '<path d="M' + fx + ' ' + (fy - fh) + ' L' + (fx + fh * 0.3) + ' ' + fy + ' L' + (fx - fh * 0.3) + ' ' + fy + ' Z" fill="#0f1c33"/>';
+    }
+    // warm haze where the village light scatters
+    s += '<rect x="0" y="420" width="1280" height="140" fill="url(#xmhaze)"/>';
+    return '<g filter="url(#xmdof)">' + s + '</g>';
+  }
+
+  function ground() {
+    var r = Art.rng(31), s = '<path d="M0 560 C 300 535, 640 575, 960 548 C 1100 538, 1200 550, 1280 545 L1280 800 L0 800 Z" fill="url(#xmsnowfield)"/>';
+    // glinting snow crystals
+    for (var i = 0; i < 40; i++) {
+      s += '<circle cx="' + (r() * 1280).toFixed(0) + '" cy="' + (575 + r() * 220).toFixed(0) + '" r="1.4" fill="#fff">' +
+        '<animate attributeName="opacity" values="0;1;0" dur="' + (2 + r() * 4).toFixed(1) + 's" begin="-' + (r() * 5).toFixed(1) + 's" repeatCount="indefinite"/></circle>';
+    }
+    return s;
+  }
+
+  // ---------- the tree ----------
+  function insideTree(x, y) {
+    var t = (y - TREE.top) / (TREE.base - TREE.top);
+    return t >= 0 && t <= 1 && Math.abs(x - TREE.x) <= TREE.half * t * (0.92 + 0.08 * Math.sin(t * 40));
+  }
+
+  function tree() {
+    var r = Art.rng(1225), s = '', i;
+    // trunk and contact shadow
+    s += '<ellipse cx="' + TREE.x + '" cy="' + (TREE.base + 10) + '" rx="240" ry="22" fill="#000" opacity=".35"/>' +
+      '<rect x="' + (TREE.x - 18) + '" y="' + (TREE.base - 20) + '" width="36" height="40" fill="#3b2416"/>';
+    // silhouette tiers with lit-from-left shading
+    for (var k = 0; k < 6; k++) {
+      var t0 = k / 6, t1 = (k + 1.35) / 6;
+      var y0 = TREE.top + t0 * (TREE.base - TREE.top), y1 = Math.min(TREE.base, TREE.top + t1 * (TREE.base - TREE.top));
+      var hw = TREE.half * Math.min(1, t1);
+      var d = 'M' + TREE.x + ' ' + (y0 - 6) + ' L' + (TREE.x + hw) + ' ' + y1;
+      for (var j = 8; j >= 0; j--) d += ' Q ' + (TREE.x - hw + (j + 0.5) * hw / 4.5) + ' ' + (y1 + 14) + ', ' + (TREE.x - hw + j * hw / 4.5) + ' ' + y1;
+      s += '<path d="' + d + ' Z" fill="url(#xmfir)"/>';
+    }
+    // needle texture: hundreds of short strokes, lighter on the lit side
+    var greens = ['#0d3320', '#124a2c', '#1a5c36', '#246b40', '#2f7a49'];
+    for (i = 0; i < 900; i++) {
+      var y = TREE.top + 10 + r() * (TREE.base - TREE.top - 10), x = TREE.x + (r() * 2 - 1) * TREE.half;
+      if (!insideTree(x, y)) continue;
+      var side = (x - TREE.x) / TREE.half, len = 8 + r() * 12, ang = (side < 0 ? Math.PI * 0.75 : Math.PI * 0.25) + (r() - 0.5) * 0.6;
+      var c = greens[Math.max(0, Math.min(4, Math.round(2 - side * 1.6 + (r() - 0.5) * 1.4)))];
+      s += '<path d="M' + x.toFixed(1) + ' ' + y.toFixed(1) + ' l' + (Math.cos(ang) * len).toFixed(1) + ' ' + (Math.sin(ang) * len).toFixed(1) + '" stroke="' + c + '" stroke-width="2.2" stroke-linecap="round"/>';
+    }
+    // snow resting on the branch tips
+    for (i = 0; i < 70; i++) {
+      var sy = TREE.top + 30 + r() * (TREE.base - TREE.top - 40), sx = TREE.x + (r() * 2 - 1) * TREE.half;
+      if (!insideTree(sx, sy)) continue;
+      s += '<ellipse cx="' + sx.toFixed(0) + '" cy="' + sy.toFixed(0) + '" rx="' + (5 + r() * 9).toFixed(1) + '" ry="' + (2 + r() * 2.5).toFixed(1) + '" fill="#f2f7ff" opacity=".9"/>';
+    }
+    // gold garland swags
+    s += '<g fill="none" stroke="url(#xmgold)" stroke-width="4" stroke-linecap="round" opacity=".9">';
+    [[0.28, 0.36], [0.46, 0.55], [0.64, 0.74], [0.82, 0.93]].forEach(function (g) {
+      var ya = TREE.top + g[0] * (TREE.base - TREE.top), yb = TREE.top + g[1] * (TREE.base - TREE.top), wa = TREE.half * g[0] * 0.9, wb = TREE.half * g[1] * 0.9;
+      s += '<path d="M' + (TREE.x - wa) + ' ' + ya + ' Q ' + TREE.x + ' ' + (yb + 30) + ', ' + (TREE.x + wb) + ' ' + yb + '"/>';
+    });
+    s += '</g>';
+    // glass baubles with specular highlights
+    var baubles = [[0.33, -0.35, 'red'], [0.4, 0.45, 'gold'], [0.52, -0.1, 'blue'], [0.6, 0.55, 'red'], [0.66, -0.6, 'gold'], [0.74, 0.2, 'red'],
+      [0.8, -0.35, 'blue'], [0.86, 0.65, 'gold'], [0.9, -0.75, 'red'], [0.5, 0.15, 'gold'], [0.7, 0.75, 'blue'], [0.94, 0.05, 'red']];
+    baubles.forEach(function (b) {
+      var by = TREE.top + b[0] * (TREE.base - TREE.top), bx = TREE.x + b[1] * TREE.half * b[0] * 0.85, br = 10 + b[0] * 8;
+      s += '<line x1="' + bx + '" y1="' + (by - br - 10) + '" x2="' + bx + '" y2="' + (by - br) + '" stroke="#c9a456" stroke-width="1"/>' +
+        '<rect x="' + (bx - 3.5) + '" y="' + (by - br - 4) + '" width="7" height="5" rx="1" fill="#d6b25e"/>' +
+        '<circle cx="' + bx + '" cy="' + by + '" r="' + br + '" fill="url(#xmb' + b[2] + ')"/>' +
+        '<ellipse cx="' + (bx - br * 0.35) + '" cy="' + (by - br * 0.4) + '" rx="' + (br * 0.28) + '" ry="' + (br * 0.18) + '" fill="#fff" opacity=".75"/>';
+    });
+    // fairy lights: a halo (bloom) + bright core; lit count follows the battery
+    var colours = ['#ffcf6e', '#ff8a6e', '#ffe9a8', '#ffb35c'];
+    for (i = 0; i < LIGHTS; i++) {
+      var tt = 0.12 + (i / (LIGHTS - 1)) * 0.86;
+      var ly = TREE.top + tt * (TREE.base - TREE.top), lx = TREE.x + Math.sin(i * 2.399) * TREE.half * tt * 0.86;
+      s += '<g class="bulb" data-k="light' + i + '" transform="translate(' + lx.toFixed(1) + ' ' + ly.toFixed(1) + ')">' +
+        '<circle class="halo" r="24" fill="url(#xmhalo)" opacity=".08" style="animation-delay:-' + (i * 0.31).toFixed(2) + 's"/>' +
+        '<circle class="core" r="4.4" fill="' + colours[i % 4] + '" opacity=".35"/></g>';
+    }
+    // star-flare glints that pop on some lights (the twinkle)
+    for (i = 0; i < 6; i++) {
+      var ft = 0.2 + i * 0.13, fy = TREE.top + ft * (TREE.base - TREE.top), fx = TREE.x + Math.sin(i * 2.1 + 1) * TREE.half * ft * 0.7;
+      s += '<g transform="translate(' + fx.toFixed(0) + ' ' + fy.toFixed(0) + ')"><g class="flare" style="animation-delay:-' + (i * 0.83).toFixed(2) + 's">' +
+        '<path d="M0 -26 L2 -2 L26 0 L2 2 L0 26 L-2 2 L-26 0 L-2 -2 Z" fill="#fffbe8"/><circle r="6" fill="url(#xmhalo)"/></g></g>';
+    }
+    // the star: glow, lens rays, gentle pulse
+    s += '<g transform="translate(' + TREE.x + ' ' + (TREE.top - 12) + ')">' +
+      '<circle r="70" fill="url(#xmstarglow)" data-k="starGlow"/>' +
+      '<g opacity=".7"><path d="M0 -95 L3 0 L0 95 L-3 0 Z M-110 0 L0 -2.5 L110 0 L0 2.5 Z" fill="#fff6d8"/>' +
+        '<animateTransform attributeName="transform" type="rotate" values="0;8;0" dur="9s" repeatCount="indefinite"/></g>' +
+      '<path d="M0 -30 L8 -10 L30 -9 L13 4 L19 27 L0 14 L-19 27 L-13 4 L-30 -9 L-8 -10 Z" fill="url(#xmgold)" stroke="#fff3c4" stroke-width="1.5"/>' +
+      '<animateTransform attributeName="transform" type="scale" additive="sum" values="1;1.06;1" dur="3s" repeatCount="indefinite"/></g>';
+    return s;
+  }
+
+  // ---------- the sleeps sign ----------
+  function sign() {
+    var r = Art.rng(9), grain = '';
+    for (var i = 0; i < 14; i++) {
+      var y = 14 + i * 13 + r() * 6;
+      grain += '<path d="M6 ' + y.toFixed(1) + ' C 90 ' + (y + r() * 6 - 3).toFixed(1) + ', 200 ' + (y + r() * 6 - 3).toFixed(1) + ', 314 ' + (y + r() * 4 - 2).toFixed(1) + '" stroke="#3a2210" stroke-opacity="' + (0.15 + r() * 0.25).toFixed(2) + '" stroke-width="' + (1 + r() * 1.5).toFixed(1) + '" fill="none"/>';
+    }
+    return '<g transform="translate(74 238) rotate(-3)">' +
+      '<rect x="146" y="196" width="28" height="170" fill="url(#xmpost)"/>' +
+      '<ellipse cx="160" cy="100" rx="230" ry="160" fill="url(#xmsignlight)"/>' +
+      '<rect x="0" y="0" width="320" height="200" rx="10" fill="url(#xmwood)"/>' + grain +
+      '<rect x="0" y="0" width="320" height="200" rx="10" fill="none" stroke="#2a170a" stroke-width="5"/>' +
+      '<rect x="10" y="10" width="300" height="180" rx="6" fill="none" stroke="#f6d7a0" stroke-opacity=".25" stroke-width="2"/>' +
+      '<circle cx="22" cy="22" r="4" fill="#8a8f96"/><circle cx="298" cy="22" r="4" fill="#8a8f96"/><circle cx="22" cy="178" r="4" fill="#8a8f96"/><circle cx="298" cy="178" r="4" fill="#8a8f96"/>' +
+      '<path d="M-6 6 C 30 -14, 80 -6, 120 -12 C 170 -18, 230 -6, 270 -12 C 300 -16, 322 -4, 326 8 L 326 14 C 250 6, 90 10, -6 16 Z" fill="#f4f8ff"/>' +
+      // painted number with a carved shadow, and the caption
+      '<text x="163" y="135" text-anchor="middle" font-family="Georgia, \'Times New Roman\', serif" font-size="122" font-weight="700" fill="#1d0f05" opacity=".65" data-k="sleepsShadow"></text>' +
+      '<text x="160" y="130" text-anchor="middle" font-family="Georgia, \'Times New Roman\', serif" font-size="122" font-weight="700" fill="url(#xmpaint)" data-k="sleeps"></text>' +
+      '<text x="160" y="172" text-anchor="middle" font-size="21" font-weight="700" letter-spacing="3" fill="' + CREAM + '" data-k="sleepsLbl"></text>' +
+      // a twinkle on the sign's corners
+      '<g transform="translate(292 34)"><g class="flare" style="animation-delay:-1.2s"><path d="M0 -20 L2 -2 L20 0 L2 2 L0 20 L-2 2 L-20 0 L-2 -2 Z" fill="#fffbe8"/></g></g>' +
+      '<g transform="translate(36 160)"><g class="flare" style="animation-delay:-3.4s"><path d="M0 -16 L2 -2 L16 0 L2 2 L0 16 L-2 2 L-16 0 L-2 -2 Z" fill="#fffbe8"/></g></g>' +
+      '</g>';
+  }
+
+  function defs() {
+    return '<defs>' +
+      '<linearGradient id="xmsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#040a1c"/><stop offset=".45" stop-color="#0d1f45"/><stop offset=".72" stop-color="#2a3560"/><stop offset="1" stop-color="#4a3a52"/></linearGradient>' +
+      '<radialGradient id="xmmoonglow"><stop offset=".15" stop-color="#fdf3d5" stop-opacity=".55"/><stop offset=".5" stop-color="#b9c8ef" stop-opacity=".12"/><stop offset="1" stop-color="#b9c8ef" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="xmhaze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb35c" stop-opacity="0"/><stop offset=".6" stop-color="#ffb35c" stop-opacity=".16"/><stop offset="1" stop-color="#ffb35c" stop-opacity="0"/></linearGradient>' +
+      '<linearGradient id="xmsnowfield" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d6ec"/><stop offset=".35" stop-color="#e9effa"/><stop offset="1" stop-color="#9eb0cf"/></linearGradient>' +
+      '<linearGradient id="xmfir" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1f5a36"/><stop offset=".5" stop-color="#123f27"/><stop offset="1" stop-color="#08241a"/></linearGradient>' +
+      '<linearGradient id="xmgold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff1c2"/><stop offset=".45" stop-color="#e8b84e"/><stop offset="1" stop-color="#9a6a1c"/></linearGradient>' +
+      '<radialGradient id="xmbred" cx=".35" cy=".3"><stop offset="0" stop-color="#ff9a8a"/><stop offset=".35" stop-color="#d4202e"/><stop offset="1" stop-color="#5a0710"/></radialGradient>' +
+      '<radialGradient id="xmbgold" cx=".35" cy=".3"><stop offset="0" stop-color="#fff2c4"/><stop offset=".35" stop-color="#e2a83a"/><stop offset="1" stop-color="#6b4508"/></radialGradient>' +
+      '<radialGradient id="xmbblue" cx=".35" cy=".3"><stop offset="0" stop-color="#bfe0ff"/><stop offset=".35" stop-color="#2f6fcf"/><stop offset="1" stop-color="#0b2552"/></radialGradient>' +
+      '<radialGradient id="xmhalo"><stop offset="0" stop-color="#fff3cf" stop-opacity="1"/><stop offset=".25" stop-color="#ffcf73" stop-opacity=".7"/><stop offset="1" stop-color="#ff9a3c" stop-opacity="0"/></radialGradient>' +
+      '<radialGradient id="xmstarglow"><stop offset="0" stop-color="#fff6d8" stop-opacity=".9"/><stop offset=".4" stop-color="#ffd27a" stop-opacity=".35"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="xmwood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a5a32"/><stop offset=".5" stop-color="#6e4422"/><stop offset="1" stop-color="#4f2f15"/></linearGradient>' +
+      '<linearGradient id="xmpost" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5a381c"/><stop offset=".5" stop-color="#7a4f2a"/><stop offset="1" stop-color="#3e2510"/></linearGradient>' +
+      '<linearGradient id="xmpaint" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#f1d9a8"/></linearGradient>' +
+      '<radialGradient id="xmsignlight"><stop offset="0" stop-color="#ffb35c" stop-opacity=".35"/><stop offset="1" stop-color="#ffb35c" stop-opacity="0"/></radialGradient>' +
+      '<radialGradient id="xmvignette" cx=".5" cy=".45" r=".75"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".7"/></radialGradient>' +
+      '<filter id="xmdof" filterUnits="userSpaceOnUse" x="0" y="300" width="1280" height="360"><feGaussianBlur stdDeviation="2.6"/></filter>' +
+      '<filter id="xmgrain" filterUnits="userSpaceOnUse" x="0" y="0" width="1280" height="800"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="1" seed="3"/>' +
+        '<feColorMatrix values="0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 1.1 -.35"/></filter>' +
+      '</defs>';
+  }
+
+  function card(key, left, dot, label) {
+    return '<div class="card" style="left:' + left + 'px"><div class="lbl"><span class="dot" style="background:' + dot + '; box-shadow:0 0 10px ' + dot + '"></span>' + label + '</div>' +
+      '<div class="val"><span data-k="' + key + 'Val"></span><small data-k="' + key + 'Unit"></small></div><div class="sub" data-k="' + key + 'Sub"></div></div>';
   }
 
   HC.themes.register('xmas', {
     label: 'Christmas',
 
     mount: function (root) {
-      var snow = '', r = Art.rng(1225);
-      for (var i = 0; i < 70; i++) {
-        var size = (2 + r() * 5).toFixed(1);
-        snow += '<i style="left:' + Math.round(r() * 1300 - 20) + 'px; width:' + size + 'px; height:' + size + 'px; opacity:' + (0.5 + r() * 0.5).toFixed(2) +
-          '; animation-duration:' + (8 + r() * 10).toFixed(1) + 's; animation-delay:-' + (r() * 18).toFixed(1) + 's"></i>';
+      var r = Art.rng(1225), snow = '', bokeh = '', i;
+      for (i = 0; i < 46; i++) {
+        var s = (2 + r() * 3).toFixed(1);
+        snow += '<i class="far" style="left:' + Math.round(r() * 1320 - 20) + 'px; width:' + s + 'px; height:' + s + 'px; opacity:' + (0.55 + r() * 0.4).toFixed(2) +
+          '; animation-duration:' + (11 + r() * 9).toFixed(1) + 's; animation-delay:-' + (r() * 20).toFixed(1) + 's"></i>';
       }
-      root.innerHTML = '<style>' + CSS + '</style><svg width="1280" height="800" viewBox="0 0 1280 800"><defs>' +
-        '<linearGradient id="xsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#061230"/><stop offset=".6" stop-color="#14306a"/><stop offset="1" stop-color="#2a4d8f"/></linearGradient>' +
-        '<linearGradient id="xaurora"><stop offset="0" stop-color="#3dffb5"/><stop offset=".5" stop-color="#5ad1ff"/><stop offset="1" stop-color="#b98bff"/></linearGradient>' +
-        '<radialGradient id="xmoonglow"><stop offset=".5" stop-color="#fff3c4" stop-opacity=".35"/><stop offset="1" stop-color="#fff3c4" stop-opacity="0"/></radialGradient>' +
-        '<radialGradient id="xstarglow"><stop offset="0" stop-color="#fff6c2" stop-opacity=".9"/><stop offset="1" stop-color="#fff6c2" stop-opacity="0"/></radialGradient>' +
-        '<radialGradient id="xwarm"><stop offset="0" stop-color="#ffcf73" stop-opacity=".55"/><stop offset="1" stop-color="#ffcf73" stop-opacity="0"/></radialGradient>' +
-        '<linearGradient id="xwindow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2c4"/><stop offset="1" stop-color="#ff9d3d" stop-opacity=".6"/></linearGradient>' +
-        '<linearGradient id="xtreeshade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient>' +
-        '<filter id="xglowf" filterUnits="userSpaceOnUse" x="0" y="0" width="1280" height="160"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
-        '</defs><rect width="1280" height="800" fill="url(#xsky)"/>' + scene() + '</svg><div class="snow">' + snow + '</div>';
+      for (i = 0; i < 12; i++) {
+        var n = (16 + r() * 22).toFixed(0);
+        snow += '<i class="near" style="left:' + Math.round(r() * 1320 - 20) + 'px; width:' + n + 'px; height:' + n + 'px; animation-duration:' + (6 + r() * 4).toFixed(1) + 's; animation-delay:-' + (r() * 10).toFixed(1) + 's"></i>';
+      }
+      // foreground lens bokeh: big out-of-focus light discs with a brighter rim
+      var bc = ['255,190,110', '255,140,110', '255,224,160', '140,190,255'];
+      [[40, 70, 120], [1140, 120, 150], [990, 40, 90], [520, 120, 70], [1180, 420, 110], [20, 500, 90], [640, 20, 60]].forEach(function (b, j) {
+        var c = bc[j % 4];
+        bokeh += '<i style="left:' + b[0] + 'px; top:' + b[1] + 'px; width:' + b[2] + 'px; height:' + b[2] + 'px; animation-duration:' + (7 + j * 1.3).toFixed(1) + 's;' +
+          ' background: radial-gradient(circle, rgba(' + c + ',.07) 0%, rgba(' + c + ',.10) 60%, rgba(' + c + ',.16) 68%, rgba(' + c + ',0) 74%)"></i>';
+      });
+
+      root.innerHTML = '<style>' + CSS + '</style>' +
+        '<svg width="1280" height="800" viewBox="0 0 1280 800">' + defs() + sky() + village() + ground() + tree() + sign() +
+          '<rect width="1280" height="800" fill="url(#xmvignette)"/>' +
+          '<rect width="1280" height="800" filter="url(#xmgrain)" opacity=".09"/>' +
+        '</svg>' +
+        '<div class="bokeh">' + bokeh + '</div><div class="snow">' + snow + '</div>' +
+        '<div class="top"><div class="title">CHRISTMAS AT <span data-k="site"></span><small data-k="subtitle"></small></div>' +
+          '<div class="clock"><span data-k="clock"></span><small data-k="date"></small></div></div>' +
+        '<div class="cards">' +
+          card('pv', 0, '#ffcf6e', 'SOLAR') + card('batt', 303, '#7dffc4', 'TREE LIGHTS') +
+          card('grid', 606, '#ff8a9a', 'GRID') + card('load', 909, '#9ad0ff', 'HOUSE') +
+        '</div>';
       el = Art.refs(root);
     },
 
     update: function (m) {
       var t = function (k, v) { Art.text(el, k, v); };
-      var gridNet = m.gridIn - m.gridOut;
-      t('pvVal', fmt.kw(m.pv) + ' kW');
-      t('gridVal', (gridNet < -0.02 ? 'out ' : 'in ') + fmt.kw(Math.abs(gridNet)) + ' kW');
-      t('loadVal', fmt.kw(m.load) + ' kW');
-      t('costVal', '£' + fmt.n(m.cost, 2));
-      el.panelGlow.setAttribute('opacity', Art.frac(m.pv, m.max.pv * 0.6) * 0.5);
 
+      // Tree lights = battery charge, filling from the bottom of the tree upwards.
       var lit = Math.round(Art.clamp(m.soc / 100, 0, 1) * LIGHTS);
       for (var i = 0; i < LIGHTS; i++) {
-        var b = el['light' + i], on = (LIGHTS - 1 - i) < lit; // fill from the bottom of the tree up
-        var cls = on ? 'bulb on' : 'bulb';
-        if (b.getAttribute('class') !== cls) { b.setAttribute('class', cls); b.style.opacity = on ? '' : 0.18; }
+        var on = (LIGHTS - 1 - i) < lit, b = el['light' + i], cls = on ? 'bulb on' : 'bulb';
+        if (b.getAttribute('class') !== cls) {
+          b.setAttribute('class', cls);
+          b.firstChild.setAttribute('opacity', on ? '.95' : '.08');
+          b.lastChild.setAttribute('opacity', on ? '1' : '.35');
+        }
       }
-      el.topGlow.setAttribute('opacity', m.batt > 0.02 ? 1 : 0.45);
-      t('battLine', fmt.n(m.soc) + '%  ' + (m.batt > 0.02 ? '· charging +' + fmt.kw(m.batt) + ' kW' : m.batt < -0.02 ? '· lighting the house' : '· resting'));
+      el.starGlow.setAttribute('opacity', m.batt > 0.02 ? 1 : 0.55);
+
+      t('pvVal', fmt.kw(m.pv)); t('pvUnit', 'kW'); t('pvSub', fmt.n(m.dailyPv, 1) + ' kWh today');
+      t('battVal', fmt.n(m.soc)); t('battUnit', '%');
+      t('battSub', m.batt > 0.02 ? 'charging +' + fmt.kw(m.batt) + ' kW' : m.batt < -0.02 ? 'powering home ' + fmt.kw(-m.batt) + ' kW' : 'resting');
+      t('gridVal', fmt.kw(Math.abs(m.gridNet))); t('gridUnit', 'kW');
+      t('gridSub', m.gridNet > 0.02 ? 'buying · £' + fmt.n(m.cost, 2) + ' today' : m.gridNet < -0.02 ? 'selling to the grid' : 'idle · £' + fmt.n(m.cost, 2) + ' today');
+      t('loadVal', fmt.kw(m.load)); t('loadUnit', 'kW'); t('loadSub', fmt.n(m.selfSufficiency) + '% home-made today');
 
       var year = m.now.getFullYear(), xmas = new Date(year, 11, 25);
-      if (m.now > new Date(year, 11, 26)) xmas = new Date(year + 1, 11, 25);
-      var sleeps = Math.ceil((new Date(xmas.getFullYear(), 11, 25) - new Date(year, m.now.getMonth(), m.now.getDate())) / 86400000);
-      t('sleeps', sleeps <= 0 ? 'Today!' : String(sleeps));
-      t('sleepsLbl', sleeps <= 0 ? 'MERRY CHRISTMAS' : sleeps === 1 ? 'SLEEP TO GO' : 'SLEEPS TO CHRISTMAS');
-      t('sub', fmt.time(m.now) + '  ·  ' + fmt.n(m.outTemp) + '°C outside  ·  ' + fmt.n(m.selfSufficiency) + '% home-made power today');
+      if (m.now >= new Date(year, 11, 26)) xmas = new Date(year + 1, 11, 25);
+      var sleeps = Math.round((xmas - new Date(year, m.now.getMonth(), m.now.getDate())) / 86400000);
+      var big = sleeps <= 0 ? '★' : String(sleeps);
+      t('sleeps', big); t('sleepsShadow', big);
+      t('sleepsLbl', sleeps <= 0 ? 'MERRY CHRISTMAS!' : sleeps === 1 ? 'SLEEP TILL CHRISTMAS' : 'SLEEPS TILL CHRISTMAS');
+
+      t('site', m.site);
+      t('subtitle', (HC.model.isLive(m) ? '' : 'LINK ' + m.link.toUpperCase() + ' · ') + fmt.n(m.outTemp) + '°C OUTSIDE');
+      t('clock', fmt.time(m.now));
+      t('date', m.now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase());
     },
   });
 })(window.HC);
