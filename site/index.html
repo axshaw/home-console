@@ -12,6 +12,7 @@
     #switch { position: fixed; top: 0; right: 0; width: 120px; height: 120px; z-index: 100; }
   </style>
   <script src="config.js"></script>
+  <script src="token.js"></script>
   <script src="ha.js"></script>
   <script src="data.js"></script>
   <script src="themes/lcars.js"></script>
@@ -69,7 +70,7 @@
   var hashToken = (location.hash.match(/[#&]token=([^&]+)/) || [])[1];
   try {
     if (hashToken) localStorage.setItem('haToken', decodeURIComponent(hashToken));
-    if (!HA_CONFIG.token) HA_CONFIG.token = localStorage.getItem('haToken') || '';
+    if (!HA_CONFIG.token) HA_CONFIG.token = window.HA_TOKEN || localStorage.getItem('haToken') || '';
   } catch (e) {}
   if (hashToken && history.replaceState) history.replaceState(null, '', location.pathname + location.search);
 
