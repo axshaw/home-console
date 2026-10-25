@@ -47,6 +47,7 @@ services:
       - "${PORT:-8088}:80"
     environment:
       HA_UPSTREAM: ${HA_UPSTREAM:-http://192.168.42.128:8123}
+      HA_TOKEN: ${HA_TOKEN:-}
     volumes:
       - repo:/repo:ro
     # Serve only site/ (never .git or deploy/), and tell browsers to revalidate so pushes show up.
@@ -56,6 +57,7 @@ services:
       - /bin/sh
       - -c
       - |
+        printf 'window.HA_TOKEN = "%s";\n' "$$HA_TOKEN" > /etc/nginx/token.js
         cat > /etc/nginx/conf.d/default.conf <<EOF
         server {
           listen 80;
@@ -63,6 +65,11 @@ services:
           index index.html;
           add_header Cache-Control "no-cache";
           location / { try_files \$$uri \$$uri/ =404; }
+          location = /token.js {
+            alias /etc/nginx/token.js;
+            default_type application/javascript;
+            add_header Cache-Control "no-store";
+          }
           location = /api/websocket {
             proxy_pass $$HA_UPSTREAM;
             proxy_http_version 1.1;
