@@ -1,8 +1,8 @@
 // Neon city: a rain-soaked Blade Runner skyline, glass billboards with katakana, a holographic
 // battery tower in the middle, a spinner crossing the sky and a scrolling news ticker.
-window.Themes = window.Themes || {};
-
-(function () {
+(function (HC) {
+  'use strict';
+  var fmt = HC.format, Art = HC.art;
   var PINK = '#ff2a8a', CYAN = '#22e8ff', AMBER = '#ffb347', VIOLET = '#9b5cff';
 
   var CSS =
@@ -82,7 +82,9 @@ window.Themes = window.Themes || {};
       '<div class="sub ' + cls + '" data-k="' + key + 'Sub"></div><div class="bar"><i data-k="' + key + 'Bar" style="background:' + color + '; box-shadow:0 0 10px ' + color + '"></i></div></div>';
   }
 
-  window.Themes.cyber = {
+  HC.themes.register('cyber', {
+    label: 'Neon city',
+
     mount: function (root) {
       var rain = '';
       var r = Art.rng(7);
@@ -125,13 +127,13 @@ window.Themes = window.Themes || {};
     update: function (m) {
       var t = function (k, v) { Art.text(el, k, v); };
       var gridNet = m.gridIn - m.gridOut;
-      t('pvVal', fmt.kw(m.pv)); t('pvSub', m.pv > 0.02 ? '▲ HARVESTING' : '■ ARRAY DORMANT'); el.pvBar.style.width = Art.clamp(m.pv / 10, 0, 1) * 100 + '%';
+      t('pvVal', fmt.kw(m.pv)); t('pvSub', m.pv > 0.02 ? '▲ HARVESTING' : '■ ARRAY DORMANT'); el.pvBar.style.width = Art.frac(m.pv, m.max.pv) * 100 + '%';
       t('gridVal', fmt.kw(Math.abs(gridNet))); t('gridSub', gridNet > 0.02 ? '◀ IMPORTING FROM CITY' : gridNet < -0.02 ? '▶ SELLING TO CITY' : '■ LINK IDLE');
-      el.gridBar.style.width = Art.clamp(Math.abs(gridNet) / 8, 0, 1) * 100 + '%';
+      el.gridBar.style.width = Art.frac(gridNet, m.max.grid) * 100 + '%';
       t('battVal', (m.batt > 0 ? '+' : '') + fmt.kw(m.batt)); t('battSub', 'HEALTH ' + fmt.n(m.soh) + '% · ' + fmt.n(m.cellTemp, 1) + '°C');
-      el.battBar.style.width = Art.clamp(Math.abs(m.batt) / 8, 0, 1) * 100 + '%';
+      el.battBar.style.width = Art.frac(m.batt, m.max.batt) * 100 + '%';
       t('loadVal', fmt.kw(m.load)); t('loadSub', 'HAB ' + fmt.n(m.inTemp, 1) + '°C · AIR ' + (m.iaqClass || '--'));
-      el.loadBar.style.width = Art.clamp(m.load / 6, 0, 1) * 100 + '%';
+      el.loadBar.style.width = Art.frac(m.load, m.max.load) * 100 + '%';
 
       var h = 356 * Art.clamp(m.soc / 100, 0, 1);
       el.liquid.setAttribute('height', h); el.liquid.setAttribute('y', 368 - h);
@@ -149,5 +151,5 @@ window.Themes = window.Themes || {};
         ' ◆ TODAY: HARVEST ' + fmt.n(m.dailyPv, 1) + 'KWH · CONSUMED ' + fmt.n(m.dailyLoad, 1) + 'KWH · CITY DRAW ' + fmt.n(m.dailyImport, 1) + 'KWH · COST £' + fmt.n(m.cost, 2) +
         ' ◆ SELF-SUFFICIENCY ' + fmt.n(m.selfSufficiency) + '% ◆ OUTSIDE ' + fmt.n(m.outTemp) + '°C ' + (m.outCond || '') + ' ◆ OFF-WORLD SOLAR CREDITS AVAILABLE NOW ◆');
     },
-  };
-})();
+  });
+})(window.HC);

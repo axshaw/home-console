@@ -4,83 +4,44 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>Power Console</title>
+  <title>Home Console</title>
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
-    /* Every theme draws on a fixed 1280×800 stage that is scaled to fit the tablet. */
+    /* Every theme draws on a fixed 1280×800 stage that is scaled to fit the screen. */
     #stage { position: absolute; left: 50%; top: 50%; width: 1280px; height: 800px; transform-origin: 0 0; overflow: hidden; }
     #switch { position: fixed; top: 0; right: 0; width: 120px; height: 120px; z-index: 100; }
   </style>
+
+  <!-- Settings: defaults, then optional local overrides and token (404s are harmless). -->
   <script src="config.js"></script>
+  <script src="config.local.js"></script>
   <script src="token.js"></script>
-  <script src="ha.js"></script>
-  <script src="data.js"></script>
+
+  <!-- Core and data sources. -->
+  <script src="core/format.js"></script>
+  <script src="core/model.js"></script>
+  <script src="core/config.js"></script>
+  <script src="core/themes.js"></script>
+  <script src="core/art.js"></script>
+  <script src="sources/homeassistant.js"></script>
+  <script src="sources/demo.js"></script>
+  <script src="sources/json.js"></script>
+
+  <!-- Themes, in tap-cycle order. -->
   <script src="themes/lcars.js"></script>
   <script src="themes/hud.js"></script>
   <script src="themes/crt.js"></script>
-  <script src="themes/common.js"></script>
   <script src="themes/cyber.js"></script>
   <script src="themes/home.js"></script>
   <script src="themes/halloween.js"></script>
   <script src="themes/xmas.js"></script>
   <script src="themes/astrolabe.js"></script>
+
+  <script src="core/app.js"></script>
 </head>
 <body>
   <div id="stage"></div>
   <div id="switch" title="Tap to change theme"></div>
-<script>
-  var THEMES = ['lcars', 'hud', 'crt', 'cyber', 'home', 'halloween', 'xmas', 'astrolabe'];
-  var stage = document.getElementById('stage');
-  var current = null;
-
-  function fit() {
-    var s = Math.min(window.innerWidth / 1280, window.innerHeight / 800);
-    stage.style.transform = 'scale(' + s + ') translate(-50%, -50%)';
-  }
-
-  function show(name) {
-    if (THEMES.indexOf(name) < 0) name = 'hud';
-    stage.innerHTML = '';
-    stage.className = 'theme-' + name;
-    current = window.Themes[name];
-    current.mount(stage);
-    current.update(Model.get());
-    try { localStorage.setItem('theme', name); } catch (e) {}
-    current.name = name;
-  }
-
-  function next() { show(THEMES[(THEMES.indexOf(current.name) + 1) % THEMES.length]); }
-
-  var urlTheme = (location.search.match(/[?&]theme=(\w+)/) || [])[1];
-  var saved = null;
-  try { saved = localStorage.getItem('theme'); } catch (e) {}
-  window.addEventListener('resize', fit);
-  document.getElementById('switch').addEventListener('click', next);
-  fit();
-  show(urlTheme || saved || HA_CONFIG.theme);
-
-  if (HA_CONFIG.rotateMinutes > 0) setInterval(next, HA_CONFIG.rotateMinutes * 60000);
-
-  // Redraw on HA changes (throttled; Sigen sensors update constantly) and once a second for clocks.
-  var pending = false;
-  function refresh() { if (current) current.update(Model.get()); }
-  HA.onChange(function () {
-    if (pending) return;
-    pending = true;
-    setTimeout(function () { pending = false; refresh(); }, 400);
-  });
-  setInterval(refresh, 1000);
-
-  // When hosted (e.g. HA's unauthenticated /local/), config.js carries no token. The tablet
-  // opens index.html#token=… once; we keep it in localStorage and strip it from the address bar.
-  var hashToken = (location.hash.match(/[#&]token=([^&]+)/) || [])[1];
-  try {
-    if (hashToken) localStorage.setItem('haToken', decodeURIComponent(hashToken));
-    if (!HA_CONFIG.token) HA_CONFIG.token = window.HA_TOKEN || localStorage.getItem('haToken') || '';
-  } catch (e) {}
-  if (hashToken && history.replaceState) history.replaceState(null, '', location.pathname + location.search);
-
-  if (!/[?&]demo=1/.test(location.search)) HA.start();
-</script>
+  <script>HC.app.start(window);</script>
 </body>
 </html>

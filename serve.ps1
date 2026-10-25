@@ -1,4 +1,4 @@
-# Tiny static file server for previewing the dashboard (localhost only).
+# Tiny static file server for previewing the dashboard (localhost only). Serves the repo root: open /site/index.html?demo=1.
 param([int]$Port = 8765, [string]$Root = $PSScriptRoot)
 $types = @{ '.html' = 'text/html; charset=utf-8'; '.js' = 'text/javascript; charset=utf-8'; '.json' = 'application/json'; '.png' = 'image/png' }
 $l = New-Object Net.HttpListener
