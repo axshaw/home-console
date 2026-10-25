@@ -1,9 +1,9 @@
 // Halloween: a moonlit graveyard. Tombstones carry the readouts, the bubbling cauldron is the
 // battery, jack-o'-lanterns glow with the solar output, and bats, a ghost, an owl and a spider
 // keep everyone company. Fun-spooky, not scary.
-window.Themes = window.Themes || {};
-
-(function () {
+(function (HC) {
+  'use strict';
+  var fmt = HC.format, Art = HC.art;
   var ORANGE = '#ff8a1f', GREEN = '#7dff5a', PURPLE = '#b06cff';
   var el = {};
 
@@ -131,7 +131,9 @@ window.Themes = window.Themes || {};
       '<text x="640" y="110" text-anchor="middle" font-size="22" fill="' + PURPLE + '" font-family="Georgia, serif" letter-spacing="3" data-k="sub"></text>';
   }
 
-  window.Themes.halloween = {
+  HC.themes.register('halloween', {
+    label: 'Halloween',
+
     mount: function (root) {
       root.innerHTML = '<style>' + CSS + '</style><svg width="1280" height="800" viewBox="0 0 1280 800"><defs>' +
         '<linearGradient id="hwsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12051f"/><stop offset=".6" stop-color="#3a1550"/><stop offset="1" stop-color="#5a2050"/></linearGradient>' +
@@ -160,12 +162,12 @@ window.Themes = window.Themes || {};
       t('battSub', m.batt > 0.02 ? 'BREWING +' + fmt.kw(m.batt) + ' kW' : m.batt < -0.02 ? 'SIPPING ' + fmt.kw(-m.batt) + ' kW' : 'SIMMERING');
 
       // Jack-o'-lanterns glow brighter the more the sun gives.
-      var glow = 0.15 + Art.clamp(m.pv / 6, 0, 1) * 0.55;
+      var glow = 0.15 + Art.frac(m.pv, m.max.pv * 0.6) * 0.55;
       for (var i = 0; i < 3; i++) el['pglow' + i].setAttribute('opacity', glow);
 
       t('ghostSign', fmt.n(m.selfSufficiency) + '% SELF-POWERED');
       var oct31 = new Date(m.now.getFullYear(), 9, 31), days = Math.ceil((oct31 - m.now) / 86400000);
       t('sub', fmt.time(m.now) + '  ·  ' + (days === 0 ? 'HAPPY HALLOWEEN!' : days > 0 ? days + (days === 1 ? ' NIGHT' : ' NIGHTS') + ' UNTIL HALLOWEEN' : 'THE SPIRITS LINGER') + '  ·  ' + fmt.n(m.outTemp) + '°C OUTSIDE');
     },
-  };
-})();
+  });
+})(window.HC);

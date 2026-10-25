@@ -1,7 +1,7 @@
 // Holographic HUD: glowing nodes on a dark grid, energy streams whose speed follows the power.
-window.Themes = window.Themes || {};
-
-(function () {
+(function (HC) {
+  'use strict';
+  var fmt = HC.format, Art = HC.art;
   var C = { cyan: '#39e6ff', solar: '#ffc94d', batt: '#4dffb0', grid: '#ff5ce1', home: '#39e6ff' };
   var R = 78, CIRC = 2 * Math.PI * R;
 
@@ -20,7 +20,7 @@ window.Themes = window.Themes || {};
 
   var CSS =
     '.theme-hud { background: radial-gradient(ellipse at 50% 45%, #0b2233 0%, #050b14 60%, #020409 100%); font-family: "Rajdhani", "Segoe UI", "Roboto", sans-serif; color: ' + C.cyan + '; }' +
-    '.theme-hud .grid { position:absolute; inset:0; left:0; top:0; right:0; bottom:0; background-image: linear-gradient(rgba(57,230,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(57,230,255,.06) 1px, transparent 1px); background-size: 40px 40px; }' +
+    '.theme-hud .grid { position:absolute; left:0; top:0; right:0; bottom:0; background-image: linear-gradient(rgba(57,230,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(57,230,255,.06) 1px, transparent 1px); background-size: 40px 40px; }' +
     '.theme-hud .scan { position:absolute; left:0; right:0; height:140px; background: linear-gradient(transparent, rgba(57,230,255,.07), transparent); animation: hudscan 7s linear infinite; pointer-events:none; }' +
     '@keyframes hudscan { from { top:-140px } to { top:800px } }' +
     '.theme-hud svg { position:absolute; left:0; top:0; }' +
@@ -71,7 +71,9 @@ window.Themes = window.Themes || {};
 
   var el = {};
 
-  window.Themes.hud = {
+  HC.themes.register('hud', {
+    label: 'Holographic HUD',
+
     mount: function (root) {
       root.innerHTML = '<style>' + CSS + '</style><div class="grid"></div>' +
         '<svg width="1280" height="800" viewBox="0 0 1280 800"><defs>' +
@@ -87,7 +89,7 @@ window.Themes = window.Themes || {};
         '</g>' +
         node('solar') + node('grid') + node('home') + node('batt') +
         '</svg>' +
-        '<div class="top"><div><span class="dot" data-k="dot"></span>POWER CORE // HOME-01 // <span data-k="state"></span></div><div><span data-k="date"></span> &nbsp; <b data-k="clock"></b></div></div>' +
+        '<div class="top"><div><span class="dot" data-k="dot"></span>POWER CORE // <span data-k="site"></span> // <span data-k="state"></span></div><div><span data-k="date"></span> &nbsp; <b data-k="clock"></b></div></div>' +
         '<div class="panel" style="left:40px; top:90px"><h4>EXTERNAL</h4><div class="big" data-k="outTemp"></div><div class="row"><span data-k="outCond"></span><span></span></div>' +
           '<div class="row"><span>HABITAT</span><span data-k="inTemp"></span></div><div class="row"><span>AIR</span><span data-k="air"></span></div></div>' +
         '<div class="panel" style="right:40px; top:90px"><h4>CELL DIAGNOSTICS</h4>' +
@@ -99,18 +101,12 @@ window.Themes = window.Themes || {};
           '<div class="row"><span>IMPORTED</span><span data-k="dImp"></span></div><div class="row"><span>EXPORTED</span><span data-k="dExp"></span></div>' +
           '<div class="row"><span>COST</span><span data-k="cost"></span></div><div class="row"><span>SELF-SUFFICIENT</span><span data-k="self"></span></div></div>' +
         '<div class="scan"></div>';
-      el = {};
-      var all = root.querySelectorAll('[data-k]');
-      for (var i = 0; i < all.length; i++) el[all[i].getAttribute('data-k')] = all[i];
+      el = Art.refs(root);
     },
 
     update: function (m) {
-      function t(k, v) { if (el[k] && el[k].textContent !== v) el[k].textContent = v; }
-      function flow(k, kw, reverse) {
-        var s = fmt.flowSpeed(kw), f = el[k + 'Flow'];
-        f.style.opacity = s ? 1 : 0;
-        if (s) { f.style.animationDuration = s + 's'; f.style.animationDirection = reverse ? 'reverse' : 'normal'; }
-      }
+      function t(k, v) { Art.text(el, k, v); }
+      function flow(k, kw, reverse) { Art.flow(el[k + 'Flow'], kw, reverse); }
       var gridNet = m.gridIn - m.gridOut;
 
       t('solarVal', fmt.kw(m.pv)); t('solarStat', m.pv > 0.02 ? 'GENERATING' : 'STANDBY');
@@ -125,6 +121,7 @@ window.Themes = window.Themes || {};
       flow('home', m.load, false);
       flow('batt', m.batt, m.batt < 0);
 
+      t('site', m.site);
       t('clock', fmt.time(m.now) + ':' + fmt.pad(m.now.getSeconds(), 2, '0'));
       t('date', m.now.toDateString().toUpperCase());
       t('state', (m.link === 'ok' || m.link === 'demo' ? m.state : 'LINK ' + m.link).toUpperCase());
@@ -146,8 +143,8 @@ window.Themes = window.Themes || {};
       }
       m.strings.forEach(function (kw, i) {
         el.strings.querySelector('[data-s="' + (i + 1) + '"]').textContent = fmt.kw(kw) + ' KW';
-        el.strings.querySelector('[data-b="' + (i + 1) + '"]').style.width = Math.min(100, kw / 2.5 * 100) + '%';
+        el.strings.querySelector('[data-b="' + (i + 1) + '"]').style.width = Math.min(100, kw / (m.max.pv / m.strings.length) * 100) + '%';
       });
     },
-  };
-})();
+  });
+})(window.HC);

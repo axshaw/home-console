@@ -1,7 +1,7 @@
 // LCARS (Star Trek: TNG) — elbows, pill buttons, chasing segment bars and a stardate.
-window.Themes = window.Themes || {};
-
-(function () {
+(function (HC) {
+  'use strict';
+  var fmt = HC.format, Art = HC.art;
   var K = { orange: '#ff9c00', peach: '#ffcc99', lilac: '#cc99cc', blue: '#9999ff', red: '#cc6666', gold: '#ffcc66', sky: '#99ccff', tan: '#cc9966' };
   var SEGS = 24;
 
@@ -35,10 +35,10 @@ window.Themes = window.Themes || {};
     '.theme-lcars .foot { left:290px; bottom:20px; font-size:24px; color:#000; line-height:30px; }';
 
   var SYSTEMS = [
-    { key: 'pv',   name: 'SOLAR ARRAY',  color: K.gold,   max: 10, top: 160 },
-    { key: 'batt', name: 'CELL BANK',    color: K.sky,    max: 8,  top: 300 },
-    { key: 'grid', name: 'GRID UPLINK',  color: K.red,    max: 8,  top: 440 },
-    { key: 'load', name: 'HABITAT LOAD', color: K.lilac,  max: 6,  top: 580 },
+    { key: 'pv',   name: 'SOLAR ARRAY',  color: K.gold,   top: 160 },
+    { key: 'batt', name: 'CELL BANK',    color: K.sky,     top: 300 },
+    { key: 'grid', name: 'GRID UPLINK',  color: K.red,     top: 440 },
+    { key: 'load', name: 'HABITAT LOAD', color: K.lilac,   top: 580 },
   ];
   var SIDE = [
     ['01-' + 'PWR', K.peach], ['02-SOL', K.gold], ['03-BAT', K.sky], ['04-GRD', K.red], ['05-HAB', K.lilac], ['06-ENV', K.tan], ['07-SYS', K.blue],
@@ -51,7 +51,9 @@ window.Themes = window.Themes || {};
 
   var el = {};
 
-  window.Themes.lcars = {
+  HC.themes.register('lcars', {
+    label: 'LCARS',
+
     mount: function (root) {
       var h = '<style>' + CSS + '</style>' +
         '<div class="abs elbow"></div><div class="abs elbow2"></div>' +
@@ -84,13 +86,11 @@ window.Themes = window.Themes || {};
           '<div><span>COST</span><b data-k="cost"></b></div><div><span>SELF-SUFF</span><b data-k="self"></b></div></div>' +
         '<div class="abs foot" style="left:490px" data-k="foot"></div>';
       root.innerHTML = h;
-      el = {};
-      var all = root.querySelectorAll('[data-k]');
-      for (var i = 0; i < all.length; i++) el[all[i].getAttribute('data-k')] = all[i];
+      el = Art.refs(root);
     },
 
     update: function (m) {
-      function t(k, v) { if (el[k] && el[k].textContent !== v) el[k].textContent = v; }
+      function t(k, v) { Art.text(el, k, v); }
       var gridNet = m.gridIn - m.gridOut;
       var vals = {
         pv:   [m.pv,   m.pv > 0.02 ? 'GENERATING' : 'STANDBY'],
@@ -102,7 +102,7 @@ window.Themes = window.Themes || {};
         var v = vals[s.key][0];
         t(s.key + 'Num', (s.key === 'batt' && v > 0 ? '+' : '') + fmt.kw(v));
         t(s.key + 'State', vals[s.key][1]);
-        var lit = Math.round(Math.min(1, Math.abs(v) / s.max) * SEGS);
+        var lit = Math.round(Math.min(1, Math.abs(v) / m.max[s.key]) * SEGS);
         if (Math.abs(v) > 0.02 && lit === 0) lit = 1;
         var segs = el[s.key + 'Segs'].children, col = el[s.key + 'Segs'].getAttribute('data-color');
         for (var i = 0; i < SEGS; i++) {
@@ -131,5 +131,5 @@ window.Themes = window.Themes || {};
       t('side6', fmt.n(m.inTemp) + '° HAB');
       t('foot', 'EXT ' + m.outCond + '  ·  AIR ' + m.iaqClass + '  ·  GRID ' + m.gridStatus + '  ·  CELL HEALTH ' + fmt.n(m.soh) + '%');
     },
-  };
-})();
+  });
+})(window.HC);

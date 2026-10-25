@@ -9,9 +9,9 @@
 //    Ley (the grid) and Hearth (the house), each moving at a pace set by its live power. Ley
 //    turns retrograde when you sell to the grid.
 //  · The household's animals are among the constellations.
-window.Themes = window.Themes || {};
-
-(function () {
+(function (HC) {
+  'use strict';
+  var fmt = HC.format, Art = HC.art;
   var CX = 640, CY = 410, B = 228, SLOTS = 144;
   var GOLD = '#d9b36c', GOLD2 = '#f3d99b', SILVER = '#c3cde3', ROSE = '#e39a8f', AQUA = '#78e6d2', INK = '#070b1d';
   var FONT = '"Cormorant Garamond", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif';
@@ -63,7 +63,7 @@ window.Themes = window.Themes || {};
     var bump = function (t, c, w) { return Math.exp(-Math.pow((t - c) / w, 2)); };
     for (var i = 0; i < now; i++) {
       var t = i / 6, sun = t > m.sunrise && t < m.sunset ? Math.sin(Math.PI * (t - m.sunrise) / (m.sunset - m.sunrise)) : 0;
-      h.pv[i] = Math.max(0, 7.2 * sun * (0.82 + 0.18 * rnd())); h.ld[i] = 0.35 + 1.5 * bump(t, 7.6, 0.9) + 0.7 * bump(t, 12.8, 1) + 2.3 * bump(t, 18.6, 1.4) + 0.2 * rnd(); h.n[i] = 1;
+      h.pv[i] = Math.max(0, m.max.pv * 0.72 * sun * (0.82 + 0.18 * rnd())); h.ld[i] = 0.35 + 1.5 * bump(t, 7.6, 0.9) + 0.7 * bump(t, 12.8, 1) + 2.3 * bump(t, 18.6, 1.4) + 0.2 * rnd(); h.n[i] = 1;
     }
     return h;
   }
@@ -179,7 +179,9 @@ window.Themes = window.Themes || {};
       '<g data-k="' + key + 'Body"><circle r="' + (r + 7) + '" fill="' + color + '" opacity=".18"/><circle r="' + r + '" fill="url(#as' + key + ')"/></g>';
   }
 
-  window.Themes.astrolabe = {
+  HC.themes.register('astrolabe', {
+    label: 'Astrolabe',
+
     mount: function (root) {
       root.innerHTML = '<style>' + CSS + '</style>' +
         '<svg width="1280" height="800" viewBox="0 0 1280 800"><defs>' +
@@ -239,8 +241,8 @@ window.Themes = window.Themes || {};
       var h = m.now.getHours() + m.now.getMinutes() / 60 + m.now.getSeconds() / 3600;
       if (Date.now() - lastDraw > 10000) {
         lastDraw = Date.now();
-        el.solArea.setAttribute('d', areaPath(hist.pv, 66 / 8, 1));
-        el.ldArea.setAttribute('d', areaPath(hist.ld, 74 / 6, -1));
+        el.solArea.setAttribute('d', areaPath(hist.pv, 66 / m.max.pv, 1));
+        el.ldArea.setAttribute('d', areaPath(hist.ld, 74 / m.max.load, -1));
         el.dayArc.setAttribute('d', arc(m.sunrise, m.sunset, 296));
         el.nightArc.setAttribute('d', arc(m.sunset, m.sunrise, 296));
       }
@@ -278,5 +280,5 @@ window.Themes = window.Themes || {};
       var ley = gridNet < -0.05 ? 'and the surplus flows out to the wider world.' : gridNet > 0.3 ? 'and the grid lends a hand.' : 'and the house keeps its own counsel.';
       t('prose', when + ', ' + sun + '; ' + vessel + ', ' + ley);
     },
-  };
-})();
+  });
+})(window.HC);

@@ -2,9 +2,9 @@
 // the utility room, a pole and meter outside, and the household going about its day: a tricolour
 // border collie on the rug, a Turkish Van cat on the bedroom windowsill, a cavapoo trotting about
 // the kitchen and a hen pecking in the garden. Animal animation is SMIL so it runs on old WebViews.
-window.Themes = window.Themes || {};
-
-(function () {
+(function (HC) {
+  'use strict';
+  var fmt = HC.format, Art = HC.art;
   var INK = '#3b2b2b';
   var el = {};
 
@@ -308,7 +308,9 @@ window.Themes = window.Themes || {};
       '<text class="chalk" x="14" y="80" font-size="13" data-k="cb3"></text><text class="chalk" x="14" y="97" font-size="13" data-k="cb4"></text></g>';
   }
 
-  window.Themes.home = {
+  HC.themes.register('home', {
+    label: 'Home cross-section',
+
     mount: function (root) {
       root.innerHTML = '<style>' + CSS + '</style><svg width="1280" height="800" viewBox="0 0 1280 800"><defs>' +
         '<linearGradient id="hosky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc6f2"/><stop offset="1" stop-color="#d7f0ff"/></linearGradient>' +
@@ -326,7 +328,7 @@ window.Themes = window.Themes || {};
       ['lamp1', 'lamp2', 'lamp3', 'lamp4'].forEach(function (k) { el[k].style.opacity = night ? 0.45 : 0; });
       el.smoke.style.opacity = m.outTemp !== undefined && m.outTemp < 12 ? 0.7 : 0;
 
-      m.strings.forEach(function (kw, i) { el['panel' + i].setAttribute('opacity', Art.clamp(kw / 2.2, 0, 1) * 0.55); });
+      m.strings.forEach(function (kw, i) { el['panel' + i].setAttribute('opacity', Art.frac(kw, m.max.pv / m.strings.length) * 0.55); });
       var cells = Math.round(Art.clamp(m.soc / 20, 0, 5));
       for (var c = 0; c < 5; c++) el['cell' + c].setAttribute('fill', c < cells ? (m.soc < 20 ? '#f4a259' : '#06d6a0') : '#dfe6e6');
       t('battScreen', fmt.n(m.soc) + '%');
@@ -359,5 +361,5 @@ window.Themes = window.Themes || {};
       t('title', 'Home, sweet home');
       t('subtitle', m.now.toLocaleDateString([], { weekday: 'long' }) + ' · ' + fmt.time(m.now) + ' · ' + (night ? 'everyone is settling in' : m.pv > 0.3 ? 'the sun is doing the work' : 'a quiet day'));
     },
-  };
-})();
+  });
+})(window.HC);

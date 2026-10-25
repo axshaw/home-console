@@ -1,9 +1,9 @@
 // Christmas: a snowy night. A log cottage with warm windows and roof lights, a big tree whose fairy
 // lights fill up with the battery charge, presents with gift tags for the readouts, a snowman
 // counting the sleeps, a robin on the fence, falling snow and a sleigh crossing the moon.
-window.Themes = window.Themes || {};
-
-(function () {
+(function (HC) {
+  'use strict';
+  var fmt = HC.format, Art = HC.art;
   var GOLD = '#ffd36b', RED = '#d62839', GREEN = '#1f6f43', CREAM = '#fff6e0';
   var LIGHTS = 36;
   var el = {};
@@ -166,7 +166,9 @@ window.Themes = window.Themes || {};
     return s;
   }
 
-  window.Themes.xmas = {
+  HC.themes.register('xmas', {
+    label: 'Christmas',
+
     mount: function (root) {
       var snow = '', r = Art.rng(1225);
       for (var i = 0; i < 70; i++) {
@@ -194,7 +196,7 @@ window.Themes = window.Themes || {};
       t('gridVal', (gridNet < -0.02 ? 'out ' : 'in ') + fmt.kw(Math.abs(gridNet)) + ' kW');
       t('loadVal', fmt.kw(m.load) + ' kW');
       t('costVal', '£' + fmt.n(m.cost, 2));
-      el.panelGlow.setAttribute('opacity', Art.clamp(m.pv / 6, 0, 1) * 0.5);
+      el.panelGlow.setAttribute('opacity', Art.frac(m.pv, m.max.pv * 0.6) * 0.5);
 
       var lit = Math.round(Art.clamp(m.soc / 100, 0, 1) * LIGHTS);
       for (var i = 0; i < LIGHTS; i++) {
@@ -212,5 +214,5 @@ window.Themes = window.Themes || {};
       t('sleepsLbl', sleeps <= 0 ? 'MERRY CHRISTMAS' : sleeps === 1 ? 'SLEEP TO GO' : 'SLEEPS TO CHRISTMAS');
       t('sub', fmt.time(m.now) + '  ·  ' + fmt.n(m.outTemp) + '°C outside  ·  ' + fmt.n(m.selfSufficiency) + '% home-made power today');
     },
-  };
-})();
+  });
+})(window.HC);

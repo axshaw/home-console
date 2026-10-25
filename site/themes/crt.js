@@ -1,9 +1,9 @@
 // Retro terminal, Fallout style: a green Pip-Boy STAT screen where the house stands in for the
 // character, with "limb condition" bars for each power source, and a RobCo-style boot sequence.
 // Theme key stays 'crt' so saved choices and ?theme=crt URLs keep working.
-window.Themes = window.Themes || {};
-
-(function () {
+(function (HC) {
+  'use strict';
+  var fmt = HC.format, Art = HC.art;
   var G = '#2bff88', DIM = '#127a42', BG = '#021a0b';
 
   var CSS =
@@ -50,7 +50,7 @@ window.Themes = window.Themes || {};
 
   var BOOT = [
     'ROBCO INDUSTRIES (TM) TERMLINK PROTOCOL',
-    'HOME-01 POWER MANAGEMENT SUBSYSTEM',
+    'HOME POWER MANAGEMENT SUBSYSTEM',
     '',
     '> INITIALISING PIP-OS ............ OK',
     '> SOLAR ARRAY ..................... ONLINE',
@@ -128,7 +128,9 @@ window.Themes = window.Themes || {};
     }, 280);
   }
 
-  window.Themes.crt = {
+  HC.themes.register('crt', {
+    label: 'Pip-Boy terminal',
+
     mount: function (root) {
       root.innerHTML = '<style>' + CSS + '</style><div class="glow">' +
         '<div class="abs boot"></div>' +
@@ -153,26 +155,20 @@ window.Themes = window.Themes || {};
             '<div><span data-k="caps"></span></div>' +
           '</div>' +
         '</div></div><div class="roll"></div><div class="lines"></div><div class="vig"></div>';
-      el = {};
-      var all = root.querySelectorAll('[data-k]');
-      for (var i = 0; i < all.length; i++) el[all[i].getAttribute('data-k')] = all[i];
+      el = Art.refs(root);
       boot(root);
     },
 
     update: function (m) {
-      function t(k, v) { if (el[k] && el[k].textContent !== v) el[k].textContent = v; }
+      function t(k, v) { Art.text(el, k, v); }
       function fill(k, frac) { el[k + 'Fill'].setAttribute('width', Math.max(0, Math.min(1, frac)) * 114); }
-      function flow(k, kw, reverse) {
-        var s = fmt.flowSpeed(kw), f = el[k + 'Flow'];
-        f.style.opacity = s ? 1 : 0;
-        if (s) { f.style.animationDuration = s + 's'; f.style.animationDirection = reverse ? 'reverse' : 'normal'; }
-      }
+      function flow(k, kw, reverse) { Art.flow(el[k + 'Flow'], kw, reverse); }
       var gridNet = m.gridIn - m.gridOut;
 
-      t('solarVal', fmt.kw(m.pv) + ' KW'); fill('solar', m.pv / 10);
-      t('gridVal', (gridNet < -0.02 ? '-' : '') + fmt.kw(Math.abs(gridNet)) + ' KW'); fill('grid', Math.abs(gridNet) / 8);
+      t('solarVal', fmt.kw(m.pv) + ' KW'); fill('solar', m.pv / m.max.pv);
+      t('gridVal', (gridNet < -0.02 ? '-' : '') + fmt.kw(Math.abs(gridNet)) + ' KW'); fill('grid', Math.abs(gridNet) / m.max.grid);
       t('gridLbl', gridNet > 0.02 ? 'GRID ▸ IN' : gridNet < -0.02 ? 'GRID ◂ OUT' : 'GRID');
-      t('loadVal', fmt.kw(m.load) + ' KW'); fill('load', m.load / 6);
+      t('loadVal', fmt.kw(m.load) + ' KW'); fill('load', m.load / m.max.load);
       t('battVal', (m.batt > 0.02 ? '+' : '') + fmt.kw(m.batt) + ' KW'); fill('batt', m.soc / 100);
       t('battLbl', m.batt > 0.02 ? 'CELLS ▴ CHARGING' : m.batt < -0.02 ? 'CELLS ▾ DRAINING' : 'CELLS');
       el.battIcon.setAttribute('width', 56 * Math.max(0, Math.min(1, m.soc / 100)));
@@ -197,5 +193,5 @@ window.Themes = window.Themes || {};
       el.lvlBar.style.width = Math.max(0, Math.min(100, m.selfSufficiency)) + '%';
       t('caps', 'CAPS ' + fmt.n(m.cost * 100));
     },
-  };
-})();
+  });
+})(window.HC);
