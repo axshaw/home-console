@@ -1,0 +1,66 @@
+# Portainer stack: nginx serves site/ from a volume that a git sidecar keeps in sync with GitHub.
+# A push to main is live within PULL_INTERVAL seconds; nothing is redeployed.
+#
+# Stack environment variables (set in Portainer → Stacks → Add stack → Environment variables):
+#   REPO            git@github.com:<owner>/home-console.git
+#   DEPLOY_KEY_B64  base64 of the read-only deploy key's private key (single line)
+#   PORT            host port for the dashboard (default 8088)
+
+services:
+  sync:
+    image: alpine/git:latest
+    restart: unless-stopped
+    environment:
+      REPO: ${REPO}
+      BRANCH: main
+      PULL_INTERVAL: "60"
+      DEPLOY_KEY_B64: ${DEPLOY_KEY_B64}
+    volumes:
+      - repo:/repo
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mkdir -p ~/.ssh
+        echo "$$DEPLOY_KEY_B64" | base64 -d > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
+        if [ ! -d /repo/.git ]; then
+          git clone --depth 1 --branch "$$BRANCH" "$$REPO" /repo
+        fi
+        while true; do
+          if git -C /repo fetch --depth 1 origin "$$BRANCH" 2>&1; then
+            if [ "$$(git -C /repo rev-parse HEAD)" != "$$(git -C /repo rev-parse FETCH_HEAD)" ]; then
+              git -C /repo reset --hard FETCH_HEAD
+              echo "updated to $$(git -C /repo log -1 --format='%h %s')"
+            fi
+          fi
+          sleep "$$PULL_INTERVAL"
+        done
+
+  web:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on: [sync]
+    ports:
+      - "${PORT:-8088}:80"
+    volumes:
+      - repo:/repo:ro
+    # Serve only site/ (never .git or deploy/), and tell browsers to revalidate so pushes show up.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cat > /etc/nginx/conf.d/default.conf <<'EOF'
+        server {
+          listen 80;
+          root /repo/site;
+          index index.html;
+          add_header Cache-Control "no-cache";
+          location / { try_files $$uri $$uri/ =404; }
+        }
+        EOF
+        exec nginx -g 'daemon off;'
+
+volumes:
+  repo:
