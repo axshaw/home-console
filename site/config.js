@@ -6,6 +6,6 @@ window.HA_CONFIG = {
   // previews on localhost have no proxy, so they talk to HA directly (Chrome allows that from localhost).
   url: location.hostname === 'localhost' ? 'http://192.168.42.128:8123' : '',
   token: '',
-  theme: 'hud',        // starting theme: 'lcars' | 'hud' | 'crt'
+  theme: 'hud',        // starting theme: lcars | hud | crt | cyber | home | halloween | xmas | astrolabe
   rotateMinutes: 0,    // cycle themes every N minutes; 0 = stay put (tap top-right corner to switch)
 };

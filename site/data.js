@@ -36,8 +36,17 @@ window.Model = (function () {
       outCond: (HA.state(w) || '').replace(/-/g, ' '),
       inTemp: HA.num('sensor.airsense_qual_temperature'),
       iaqClass: HA.state('sensor.airsense_qual_iaq_classification') || '',
+      sunrise: hourOf(HA.state('sensor.sun_next_rising'), 7),
+      sunset: hourOf(HA.state('sensor.sun_next_setting'), 17.5),
       link: HA.status(),
     };
+  }
+
+  // Local hour-of-day (e.g. 7.75) from an ISO timestamp. "Next rising" may be tomorrow's, but the
+  // time of day barely moves, which is all the themes need.
+  function hourOf(iso, fallback) {
+    var d = iso ? new Date(iso) : null;
+    return d && !isNaN(d) ? d.getHours() + d.getMinutes() / 60 : fallback;
   }
 
   // A sunny afternoon, gently wobbling, so every flow animates in previews.
@@ -54,7 +63,7 @@ window.Model = (function () {
       strings: [1.7, 1.6, 1.5, 1.4].map(function (s, i) { return s + Math.sin(t / (5 + i)) * 0.2; }),
       dailyPv: 18.4, dailyLoad: 14.2, dailyImport: 1.3, dailyExport: 4.9, cost: 0.31, totalPv: 10.27,
       state: 'Running', gridStatus: 'On Grid', outTemp: 19, outCond: 'sunny', inTemp: 21.2,
-      iaqClass: 'Good', link: 'demo',
+      iaqClass: 'Good', sunrise: 7.7, sunset: 17.4, link: 'demo',
     };
   }
 
