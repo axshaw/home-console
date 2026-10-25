@@ -63,6 +63,16 @@
     setTimeout(function () { pending = false; refresh(); }, 400);
   });
   setInterval(refresh, 1000);
+
+  // When hosted (e.g. HA's unauthenticated /local/), config.js carries no token. The tablet
+  // opens index.html#token=… once; we keep it in localStorage and strip it from the address bar.
+  var hashToken = (location.hash.match(/[#&]token=([^&]+)/) || [])[1];
+  try {
+    if (hashToken) localStorage.setItem('haToken', decodeURIComponent(hashToken));
+    if (!HA_CONFIG.token) HA_CONFIG.token = localStorage.getItem('haToken') || '';
+  } catch (e) {}
+  if (hashToken && history.replaceState) history.replaceState(null, '', location.pathname + location.search);
+
   if (!/[?&]demo=1/.test(location.search)) HA.start();
 </script>
 </body>
