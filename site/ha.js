@@ -1,6 +1,7 @@
-// Minimal Home Assistant WebSocket client. WebSockets aren't subject to CORS, so this works
-// from Craft's file:// page where fetch() against the REST API would be blocked.
+// Minimal Home Assistant WebSocket client.
 // Uses subscribe_entities, which sends full states once ("a") then compact diffs ("c").
+// An empty HA_CONFIG.url means "same origin": nginx proxies /api/websocket to HA, because
+// Chrome's Local Network Access blocks an http:// page from opening sockets to other LAN hosts.
 
 window.HA = (() => {
   const states = {}; // entity_id -> { state, attributes }
@@ -12,7 +13,8 @@ window.HA = (() => {
 
   function connect() {
     const { url, token } = window.HA_CONFIG;
-    const ws = new WebSocket(url.replace(/^http/, 'ws') + '/api/websocket');
+    const base = url || location.protocol + '//' + location.host;
+    const ws = new WebSocket(base.replace(/^http/, 'ws') + '/api/websocket');
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'auth_required') {
